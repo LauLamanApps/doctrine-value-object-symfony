@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace LauLamanApps\DoctrineValueObject\Tests\DependencyInjection;
 
 use LauLamanApps\DoctrineValueObject\DependencyInjection\Compiler\DoctrineApplicationTypeRegisterCompilerPass;
+use LauLamanApps\DoctrineValueObject\Doctrine\IdType;
 use LauLamanApps\DoctrineValueObject\Tests\Fixtures\StatusType;
-use LauLamanApps\DoctrineValueObject\Tests\Fixtures\UserIdType;
+use LauLamanApps\DoctrineValueObject\Tests\Fixtures\UserId;
 use LauLamanApps\DoctrineValueObject\Tests\Fixtures\UsernameType;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -17,8 +18,8 @@ final class DoctrineApplicationTypeRegisterCompilerPassTest extends TestCase
 
     public function testItRegistersEveryDeclaredCustomType(): void
     {
-        // Force the fixture types to be autoloaded so get_declared_classes() sees them.
-        class_exists(UserIdType::class);
+        // Force the fixtures to be autoloaded so get_declared_classes() sees them.
+        class_exists(UserId::class);
         class_exists(UsernameType::class);
         class_exists(StatusType::class);
 
@@ -30,7 +31,8 @@ final class DoctrineApplicationTypeRegisterCompilerPassTest extends TestCase
         /** @var array<string, array{class: class-string}> $types */
         $types = $container->getParameter(self::PARAM);
 
-        self::assertSame(['class' => UserIdType::class], $types['user_id']);
+        // An AbstractId subclass with a NAME maps to the shared IdType, not a dedicated type class.
+        self::assertSame(['class' => IdType::class], $types['user_id']);
         self::assertSame(['class' => UsernameType::class], $types['username']);
         self::assertSame(['class' => StatusType::class], $types['status']);
         // existing entries are preserved, never overwritten

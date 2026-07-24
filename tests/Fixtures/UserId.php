@@ -8,4 +8,5 @@ use LauLamanApps\DoctrineValueObject\ValueObject\AbstractId;
 
 final class UserId extends AbstractId
 {
+    public const string NAME = 'user_id';
 }

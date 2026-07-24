@@ -6,12 +6,12 @@ namespace LauLamanApps\DoctrineValueObject\Tests\Fixtures;
 
 use LauLamanApps\DoctrineValueObject\Doctrine\AbstractValueObjectType;
 
-final class UserIdType extends AbstractValueObjectType
+final class AgeType extends AbstractValueObjectType
 {
-    public const string NAME = 'user_id';
+    public const string NAME = 'age';
 
     public function getClassName(): string
     {
-        return UserId::class;
+        return Age::class;
     }
 }

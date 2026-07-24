@@ -37,33 +37,19 @@ No `Kernel::build()` wiring, no `doctrine.dbal.types` config.
 
 ### 1. A dedicated ID per entity
 
-The ID is a tiny class extending the shared base:
+The ID is a tiny class extending the shared base — declare a `NAME` and that's the whole class.
+No separate Doctrine type per ID:
 
 ```php
 use LauLamanApps\DoctrineValueObject\ValueObject\AbstractId;
 
 final class PersonId extends AbstractId
 {
-}
-```
-
-Add a matching Doctrine type — the only thing it needs is a `NAME` and the class it maps:
-
-```php
-use LauLamanApps\DoctrineValueObject\Doctrine\AbstractValueObjectType;
-
-final class PersonIdType extends AbstractValueObjectType
-{
     public const string NAME = 'person_id';
-
-    public function getClassName(): string
-    {
-        return PersonId::class;
-    }
 }
 ```
 
-Map the entity column to it — nothing else to configure:
+Map the entity column to that `NAME` — nothing else to configure:
 
 ```php
 #[ORM\Id]
@@ -72,9 +58,12 @@ Map the entity column to it — nothing else to configure:
 private PersonId $id;
 ```
 
-`AbstractValueObjectType` converts both ways (`new PersonId($value)` ⇄ `$id->getValue()`),
-picks the SQL column type (string vs integer) from the value object, and refuses to persist a
-value object that fails its own `isValid()` (throwing `ValueObjectIsNotSafeToPersistException`).
+Every ID is served by the shared `Doctrine\IdType`: the compiler pass registers each
+`AbstractId` subclass' `NAME` against it, and at runtime it resolves the concrete ID class back
+from the name it was registered under. It converts both ways (`new PersonId($value)` ⇄
+`$id->getValue()`), uses an integer column, and refuses to persist an ID that fails its own
+`isValid()` (throwing `ValueObjectIsNotSafeToPersistException`). An `AbstractId` subclass without
+a `NAME` is simply not registered — handy for IDs you never persist as a column.
 
 ### 2. Rich value objects
 
@@ -97,7 +86,26 @@ final class EmailAddress extends AbstractValueObjectString
 }
 ```
 
-Give it an `AbstractValueObjectType` subclass (as above) and map columns to it.
+Rich value objects still get a small `AbstractValueObjectType` subclass — the only thing it needs
+is a `NAME` and the class it maps:
+
+```php
+use LauLamanApps\DoctrineValueObject\Doctrine\AbstractValueObjectType;
+
+final class EmailAddressType extends AbstractValueObjectType
+{
+    public const string NAME = 'email_address';
+
+    public function getClassName(): string
+    {
+        return EmailAddress::class;
+    }
+}
+```
+
+`AbstractValueObjectType` picks the SQL column type (string vs integer) from the value object,
+converts both ways, and refuses to persist a value object that fails its own `isValid()`. Map
+columns with `#[ORM\Column(type: 'email_address')]`.
 
 ### 3. Backed-enum columns
 
@@ -117,12 +125,16 @@ final class StatusType extends AbstractPhpEnumType
 
 ## Auto-registration — how it works
 
-The `DoctrineApplicationTypeRegisterCompilerPass` scans loaded classes for
-`AbstractValueObjectType` / `AbstractPhpEnumType` subclasses and registers each with Doctrine
-under its `NAME`. It relies on your type classes being **loaded** at container-compile time —
-the standard `App\` service loader (`resource: '../src/'`) does this by reflecting over `src/`,
-so no extra step is needed. A type without a non-empty `NAME` constant fails fast with a clear
-error.
+The `DoctrineApplicationTypeRegisterCompilerPass` scans loaded classes and registers each with
+Doctrine under its `NAME`:
+
+- every `AbstractId` subclass that declares a `NAME` → the shared `Doctrine\IdType`;
+- every `AbstractValueObjectType` / `AbstractPhpEnumType` subclass → itself, under its own `NAME`.
+
+It relies on those classes being **loaded** at container-compile time — the standard `App\`
+service loader (`resource: '../src/'`) does this by reflecting over `src/`, so no extra step is
+needed. A dedicated type without a non-empty `NAME` constant fails fast with a clear error; an
+`AbstractId` without a `NAME` is skipped (not every ID is persisted).
 
 ## What's in the box
 
@@ -130,8 +142,9 @@ error.
 |---|---|
 | `ValueObject\AbstractValueObject` | Base value object (`sanitize` / `isValid` / `__toString`) |
 | `ValueObject\AbstractValueObjectInteger` · `AbstractValueObjectString` | Typed int / string value objects |
-| `ValueObject\AbstractId` | Integer-id value object base (what every `*Id` extends) |
-| `Doctrine\AbstractValueObjectType` | Doctrine type mapping a value object ↔ column |
+| `ValueObject\AbstractId` | Integer-id value object base (what every `*Id` extends); declare a `NAME` to auto-map it |
+| `Doctrine\IdType` | The one shared Doctrine type serving every `AbstractId` by `NAME` — no per-ID type class |
+| `Doctrine\AbstractValueObjectType` | Doctrine type mapping a (non-ID) value object ↔ column |
 | `Doctrine\AbstractPhpEnumType` | Doctrine type for backed enums |
 | `Doctrine\Exception\ValueObjectIsNotSafeToPersistException` | Thrown when an invalid VO would be persisted |
 | `DependencyInjection\Compiler\DoctrineApplicationTypeRegisterCompilerPass` | The zero-config registrar (wired by the bundle) |

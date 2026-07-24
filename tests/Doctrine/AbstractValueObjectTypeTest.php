@@ -6,10 +6,10 @@ namespace LauLamanApps\DoctrineValueObject\Tests\Doctrine;
 
 use Doctrine\DBAL\Platforms\AbstractPlatform;
 use LauLamanApps\DoctrineValueObject\Doctrine\Exception\ValueObjectIsNotSafeToPersistException;
+use LauLamanApps\DoctrineValueObject\Tests\Fixtures\Age;
+use LauLamanApps\DoctrineValueObject\Tests\Fixtures\AgeType;
 use LauLamanApps\DoctrineValueObject\Tests\Fixtures\AlwaysInvalidId;
 use LauLamanApps\DoctrineValueObject\Tests\Fixtures\AlwaysInvalidIdType;
-use LauLamanApps\DoctrineValueObject\Tests\Fixtures\UserId;
-use LauLamanApps\DoctrineValueObject\Tests\Fixtures\UserIdType;
 use LauLamanApps\DoctrineValueObject\Tests\Fixtures\Username;
 use LauLamanApps\DoctrineValueObject\Tests\Fixtures\UsernameType;
 use PHPUnit\Framework\TestCase;
@@ -18,15 +18,15 @@ final class AbstractValueObjectTypeTest extends TestCase
 {
     public function testConvertToPhpValueBuildsTheValueObject(): void
     {
-        $result = (new UserIdType())->convertToPHPValue('42', $this->platform());
+        $result = (new AgeType())->convertToPHPValue('42', $this->platform());
 
-        self::assertInstanceOf(UserId::class, $result);
+        self::assertInstanceOf(Age::class, $result);
         self::assertSame(42, $result->getValue());
     }
 
     public function testConvertToPhpValueReturnsNullForNull(): void
     {
-        $type = new UserIdType();
+        $type = new AgeType();
 
         self::assertNull($type->convertToPHPValue(null, $this->platform()));
         self::assertNull($type->convertToPHPValue('NULL', $this->platform()));
@@ -34,13 +34,13 @@ final class AbstractValueObjectTypeTest extends TestCase
 
     public function testConvertToDatabaseValueUnwrapsTheValueObject(): void
     {
-        self::assertSame(42, (new UserIdType())->convertToDatabaseValue(new UserId(42), $this->platform()));
+        self::assertSame(42, (new AgeType())->convertToDatabaseValue(new Age(42), $this->platform()));
         self::assertSame('alice', (new UsernameType())->convertToDatabaseValue(new Username('alice'), $this->platform()));
     }
 
     public function testConvertToDatabaseValuePassesScalarsThrough(): void
     {
-        $type = new UserIdType();
+        $type = new AgeType();
 
         self::assertSame(42, $type->convertToDatabaseValue(42, $this->platform()));
         self::assertSame('x', $type->convertToDatabaseValue('x', $this->platform()));
@@ -59,7 +59,7 @@ final class AbstractValueObjectTypeTest extends TestCase
     {
         $this->expectException(\LogicException::class);
 
-        (new UserIdType())->convertToDatabaseValue(new \stdClass(), $this->platform());
+        (new AgeType())->convertToDatabaseValue(new \stdClass(), $this->platform());
     }
 
     public function testSqlDeclarationUsesIntegerColumnForIntegerValueObject(): void
@@ -67,7 +67,7 @@ final class AbstractValueObjectTypeTest extends TestCase
         $platform = $this->platform();
         $platform->method('getIntegerTypeDeclarationSQL')->willReturn('INT');
 
-        self::assertSame('INT', (new UserIdType())->getSQLDeclaration(['name' => 'id'], $platform));
+        self::assertSame('INT', (new AgeType())->getSQLDeclaration(['name' => 'id'], $platform));
     }
 
     public function testSqlDeclarationUsesStringColumnForStringValueObject(): void

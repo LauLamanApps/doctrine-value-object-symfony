@@ -6,12 +6,16 @@ namespace LauLamanApps\DoctrineValueObject\DependencyInjection\Compiler;
 
 use LauLamanApps\DoctrineValueObject\Doctrine\AbstractPhpEnumType;
 use LauLamanApps\DoctrineValueObject\Doctrine\AbstractValueObjectType;
+use LauLamanApps\DoctrineValueObject\Doctrine\IdType;
+use LauLamanApps\DoctrineValueObject\ValueObject\AbstractId;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
  * Registers every concrete {@see AbstractValueObjectType} / {@see AbstractPhpEnumType} with
- * Doctrine, keyed by its `NAME` constant — no manual `doctrine.dbal.types` config needed.
+ * Doctrine, keyed by its `NAME` constant, plus every {@see AbstractId} subclass that declares a
+ * `NAME` — those map to the shared {@see IdType}, so an id needs no dedicated type class.
+ * No manual `doctrine.dbal.types` config needed.
  *
  * It discovers types via get_declared_classes(), which relies on the consuming app having
  * loaded them — the standard `App\` service loader does this by reflecting over `src/`.
@@ -42,15 +46,32 @@ final class DoctrineApplicationTypeRegisterCompilerPass implements CompilerPassI
     private function findCustomTypes(): \Generator
     {
         foreach (get_declared_classes() as $className) {
-            if (
-                !is_subclass_of($className, AbstractValueObjectType::class)
-                && !is_subclass_of($className, AbstractPhpEnumType::class)
-            ) {
+            $isId = is_subclass_of($className, AbstractId::class);
+            $isDedicatedType = is_subclass_of($className, AbstractValueObjectType::class)
+                || is_subclass_of($className, AbstractPhpEnumType::class);
+
+            if (!$isId && !$isDedicatedType) {
+                continue;
+            }
+
+            // The shared id type carries no NAME of its own; it is registered via the AbstractId names below.
+            if (IdType::class === $className) {
                 continue;
             }
 
             $reflection = new \ReflectionClass($className);
             if ($reflection->isAbstract()) {
+                continue;
+            }
+
+            if ($isId) {
+                // Not every AbstractId is persisted as a column, so a missing NAME is not an error —
+                // only the ones that declare a non-empty NAME are auto-registered against the shared IdType.
+                $name = $reflection->getConstant('NAME');
+                if (is_string($name) && '' !== $name) {
+                    yield $name => IdType::class;
+                }
+
                 continue;
             }
 
